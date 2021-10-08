@@ -288,6 +288,7 @@ struct kvm_vcpu {
 	
 	u64 last_exit_start;
 	u64 total_exit_time;
+	bool absorb_exit_time;
 
 #ifdef CONFIG_HAS_IOMEM
 	int mmio_needed;
