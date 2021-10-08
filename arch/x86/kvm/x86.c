@@ -3370,10 +3370,7 @@ static int get_msr_mce(struct kvm_vcpu *vcpu, u32 msr, u64 *pdata, bool host)
 }
 
 int kvm_get_msr_common(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
-{
-	u64 differece;
-	u64 final_time;
-	
+{	
 	switch (msr_info->index) {
 	case MSR_IA32_PLATFORM_ID:
 	case MSR_IA32_EBL_CR_POWERON:
@@ -3443,8 +3440,6 @@ int kvm_get_msr_common(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 		 * return L1's TSC value to ensure backwards-compatible
 		 * behavior for migration.
 		 */
-		differece = rdtsc() - vcpu->last_exit_start;
-		final_time = vcpu->total_exit_time + differece;
 
 		msr_info->data = vcpu->last_exit_start - vcpu->total_exit_time;
 		
@@ -9142,7 +9137,6 @@ out:
 static int vcpu_enter_guest(struct kvm_vcpu *vcpu) 
 {
 	int result;
-	u64 differece;
 
 	vcpu->last_exit_start = rdtsc();
 
@@ -9150,8 +9144,7 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 
 	if ((vcpu->run->exit_reason == 123)||(vcpu->absorb_exit_time))
 	{
-		differece = rdtsc() - vcpu->last_exit_start;
-		vcpu->total_exit_time += differece;
+		vcpu->total_exit_time += rdtsc() - vcpu->last_exit_starte;
 		vcpu->absorb_exit_time = false;
 	}
 
