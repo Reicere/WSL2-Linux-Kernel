@@ -1160,6 +1160,7 @@ static void init_vmcb(struct vcpu_svm *svm)
 	svm_set_intercept(svm, INTERCEPT_XSETBV);
 	svm_set_intercept(svm, INTERCEPT_RDPRU);
 	svm_set_intercept(svm, INTERCEPT_RSM);
+	svm_set_intercept(svm, INTERCEPT_RDTSC);
 
 	if (!kvm_mwait_in_guest(svm->vcpu.kvm)) {
 		svm_set_intercept(svm, INTERCEPT_MONITOR);
@@ -2182,6 +2183,8 @@ static int skinit_interception(struct vcpu_svm *svm)
 
 static int wbinvd_interception(struct vcpu_svm *svm)
 {
+	svm->vcpu.run->exit_reason = 123;
+	
 	return kvm_emulate_wbinvd(&svm->vcpu);
 }
 
@@ -2190,6 +2193,8 @@ static int xsetbv_interception(struct vcpu_svm *svm)
 	u64 new_bv = kvm_read_edx_eax(&svm->vcpu);
 	u32 index = kvm_rcx_read(&svm->vcpu);
 
+	svm->vcpu.run->exit_reason = 123;
+	
 	if (kvm_set_xcr(&svm->vcpu, index, new_bv) == 0) {
 		return kvm_skip_emulated_instruction(&svm->vcpu);
 	}
@@ -2269,6 +2274,7 @@ static int task_switch_interception(struct vcpu_svm *svm)
 
 static int cpuid_interception(struct vcpu_svm *svm)
 {
+	svm->vcpu.run->exit_reason = 123;
 	return kvm_emulate_cpuid(&svm->vcpu);
 }
 
@@ -2284,6 +2290,8 @@ static int iret_interception(struct vcpu_svm *svm)
 
 static int invd_interception(struct vcpu_svm *svm)
 {
+	svm->vcpu.run->exit_reason = 123;
+	
 	/* Treat an INVD instruction as a NOP and just skip it. */
 	return kvm_skip_emulated_instruction(&svm->vcpu);
 }
@@ -2874,6 +2882,24 @@ static int invpcid_interception(struct vcpu_svm *svm)
 	return kvm_handle_invpcid(vcpu, type, gva);
 }
 
+static int handle_rdtsc_interception(struct vcpu_svm *svm) 
+{
+	u64 differece;
+	u64 final_time;
+	u64 data;
+	
+	differece = rdtsc() - svm->vcpu.last_exit_start;
+	final_time = svm->vcpu.total_exit_time + differece;
+
+	data = rdtsc() - final_time;
+
+	svm->vcpu.arch.regs[VCPU_REGS_RAX] = data & -1u;
+	svm->vcpu.arch.regs[VCPU_REGS_RDX] = (data >> 32) & -1u;
+
+	svm->vcpu.run->exit_reason = 123;
+	return nop_interception(svm);
+}
+
 static int (*const svm_exit_handlers[])(struct vcpu_svm *svm) = {
 	[SVM_EXIT_READ_CR0]			= cr_interception,
 	[SVM_EXIT_READ_CR3]			= cr_interception,
@@ -2941,6 +2967,7 @@ static int (*const svm_exit_handlers[])(struct vcpu_svm *svm) = {
 	[SVM_EXIT_RSM]                          = rsm_interception,
 	[SVM_EXIT_AVIC_INCOMPLETE_IPI]		= avic_incomplete_ipi_interception,
 	[SVM_EXIT_AVIC_UNACCELERATED_ACCESS]	= avic_unaccelerated_access_interception,
+	[SVM_EXIT_RDTSC]			= handle_rdtsc_interception,
 };
 
 static void dump_vmcb(struct kvm_vcpu *vcpu)
