@@ -3446,7 +3446,7 @@ int kvm_get_msr_common(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 		differece = rdtsc() - vcpu->last_exit_start;
 		final_time = vcpu->total_exit_time + differece;
 
-		msr_info->data = rdtsc() - final_time;
+		msr_info->data = vcpu->last_exit_start - vcpu->total_exit_time;
 		
 		vcpu->run->exit_reason = 123;
 		break;
@@ -9148,10 +9148,11 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 
 	result = vcpu_enter_guest_real(vcpu);
 
-	if (vcpu->run->exit_reason == 123) 
+	if ((vcpu->run->exit_reason == 123)||(vcpu->absorb_exit_time))
 	{
 		differece = rdtsc() - vcpu->last_exit_start;
 		vcpu->total_exit_time += differece;
+		vcpu->absorb_exit_time = false;
 	}
 
 	return result;
